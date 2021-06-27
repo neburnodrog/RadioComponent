@@ -1,14 +1,26 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   Container,
   Nav,
   Main,
   RadioChannel,
+  LogoSection,
+  NameSection,
+  RadioLogo,
   Title,
   IconWrapper,
+  PlayingRadioName,
   Hr,
+  Small,
+  CurrentlyPlayingSection,
 } from './styled/Lib';
-import { PowerOff, ChevronLeft } from '@styled-icons/fa-solid';
+import { randomHexColor, getLuminosity } from '../helpers';
+import {
+  PowerOff,
+  ChevronLeft,
+  PlusCircle,
+  MinusCircle,
+} from '@styled-icons/fa-solid';
 
 interface IRadioChannel {
   name: string;
@@ -22,41 +34,92 @@ const Radio: React.FC<{}> = () => {
     null,
   );
 
-  const fetchRadios = async (): Promise<Array<IRadioChannel>> => {
-    const response = await fetch('https://teclead.de/recruiting/radios');
-    const data = await response.json();
-    return data.radios;
-  };
-
   useEffect(() => {
     fetchRadios()
       .then(radios => {
-        console.log(radios);
         setRadioChannels(radios);
       })
       .catch(err => console.error(err));
   }, []);
 
-  useEffect(() => {
-    console.log(currentPlaying);
-  }, [currentPlaying]);
+  const fetchRadios = async (): Promise<Array<IRadioChannel>> => {
+    const response = await fetch('https://teclead.de/recruiting/radios');
+    const data = await response.json();
+    const radios = data.radios;
+    radios.forEach((radio: IRadioChannel) => {
+      let backgroundColor = randomHexColor();
+
+      radio.image = radio.image.replace('RadioOne', radio.name);
+      radio.image = radio.image.replace('3d43ff', backgroundColor);
+      if (getLuminosity(backgroundColor) > 125) {
+        radio.image = radio.image.replace('ffffff', '000000');
+      }
+    });
+    return radios;
+  };
+
+  const handlePlay = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const channel = radioChannels.find(
+      channel => channel.name === e.currentTarget.name,
+    );
+
+    if (channel !== undefined) {
+      setCurrentPlaying(channel);
+    }
+  };
+
+  const handleChangeChannel = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const action = e.currentTarget.name;
+
+    if (!currentPlaying) return;
+
+    const currChannelIdx = radioChannels.indexOf(currentPlaying);
+    const nextChannelIdx =
+      action === 'next'
+        ? (currChannelIdx + 1) % radioChannels.length
+        : (radioChannels.length + currChannelIdx - 1) % radioChannels.length;
+
+    const newChannel = radioChannels[nextChannelIdx];
+    setCurrentPlaying(newChannel);
+  };
 
   const renderChannels = () => {
     return radioChannels
-      ? radioChannels.map(radioChannel => {
+      ? radioChannels.map((radioChannel, i) => {
+          const clicked = radioChannel === currentPlaying;
+
           return (
-            <>
-              <RadioChannel
-                clicked={radioChannel === currentPlaying}
-                onClick={e => setCurrentPlaying(radioChannel)}
+            <RadioChannel key={i}>
+              <LogoSection clicked={clicked}>
+                <IconWrapper
+                  name={'prev'}
+                  onClick={handleChangeChannel}
+                  secondary
+                >
+                  <MinusCircle size={'1.5em'} />
+                </IconWrapper>
+                <RadioLogo src={radioChannel.image} alt="radioLogo" />
+                <IconWrapper
+                  name={'next'}
+                  onClick={handleChangeChannel}
+                  secondary
+                >
+                  <PlusCircle size={'1.5em'} />
+                </IconWrapper>
+              </LogoSection>
+              <NameSection
+                tabIndex={1}
+                clicked={clicked}
+                onClick={handlePlay}
+                name={radioChannel.name}
               >
                 <div>{radioChannel.name}</div>
                 <div>
                   <b>{radioChannel.frequency}</b>
                 </div>
-              </RadioChannel>
+              </NameSection>
               <Hr />
-            </>
+            </RadioChannel>
           );
         })
       : null;
@@ -78,6 +141,12 @@ const Radio: React.FC<{}> = () => {
         </IconWrapper>
       </Nav>
       <Main>{renderChannels()}</Main>
+      {currentPlaying && (
+        <CurrentlyPlayingSection>
+          <Small>CURRENTLY PLAYING</Small>
+          <PlayingRadioName>{currentPlaying.name}</PlayingRadioName>
+        </CurrentlyPlayingSection>
+      )}
     </Container>
   );
 };
